@@ -262,7 +262,7 @@ function GuestsContent() {
 
     const eventObj = events.find(e => e.id === activeEventId);
     const eventTitle = eventObj ? eventObj.title : "الفعالية";
-    const previewUrl = `http://localhost:8000/api/v1/invitations/${guest.id}/preview`;
+    const previewUrl = `${API_URL}/invitations/${guest.id}/preview`;
     
     const message = `مرحباً ${guest.name}، نتشرف بدعوتكم لحضور ${eventTitle}.\nيمكنك معاينة بطاقة الدعوة الخاصة بك عبر الرابط المباشر التالي:\n${previewUrl}`;
     
@@ -287,7 +287,7 @@ function GuestsContent() {
       });
 
       const token = localStorage.getItem("auth_token") || "";
-      const downloadUrl = `http://localhost:8000/api/v1/invitations/${guestId}/download?format=png&auth_token=${token}`;
+      const downloadUrl = `${API_URL}/invitations/${guestId}/download?format=png&auth_token=${token}`;
       window.open(downloadUrl, "_blank");
       fetchGuests(activeEventId);
     } catch (err: any) {

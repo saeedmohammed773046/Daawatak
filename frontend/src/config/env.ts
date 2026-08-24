@@ -1,5 +1,5 @@
 export const env = {
-  apiUrl: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1',
+  apiUrl: import.meta.env.VITE_API_URL || 'https://daawatak.onrender.com/api/v1',
   appName: 'Daawatak',
   appNameAr: 'دعوتك',
   mockDelayMs: Number(import.meta.env.VITE_MOCK_DELAY_MS || 500),

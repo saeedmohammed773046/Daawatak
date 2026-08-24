@@ -3,5 +3,5 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect('http://localhost:3000');
+    return redirect(env('FRONTEND_URL', 'https://daawatak-1.onrender.com'));
 });
