@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0B0E14; /* Deep Midnight */
+  --foreground: #F9F9FB;
+  --card: rgba(18, 24, 38, 0.6); /* Glassmorphism card bg */
+  --card-border: rgba(255, 255, 255, 0.05);
+  --card-foreground: #F9F9FB;
+  --primary: #D4AF37; /* Luxury Gold */
+  --primary-foreground: #0B0E14;
+  --accent: #3B82F6; /* Neon Blue */
+  --accent-foreground: #FFFFFF;
+  --muted: #64748B;
+  --border: rgba(255, 255, 255, 0.08);
+  
+  --font-sans: var(--font-cairo), var(--font-inter), sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --font-sans: var(--font-sans);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Glowing animations */
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);
+  }
+}
+
+.gold-glow {
+  animation: glow 3s infinite ease-in-out;
+}

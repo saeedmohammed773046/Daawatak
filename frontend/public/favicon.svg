@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4AF37"/>
+      <stop offset="50%" stop-color="#F3E5AB"/>
+      <stop offset="100%" stop-color="#AA7C11"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bgGrad)"/>
+  <!-- Envelope & Star Motif -->
+  <rect x="10" y="18" width="44" height="32" rx="6" fill="none" stroke="url(#goldGrad)" stroke-width="2.5"/>
+  <path d="M10 23 L32 38 L54 23" stroke="url(#goldGrad)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 10 L34.5 16 L41 16.5 L36 20.5 L37.5 27 L32 23.5 L26.5 27 L28 20.5 L23 16.5 L29.5 16 Z" fill="url(#goldGrad)"/>
+</svg>

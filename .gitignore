@@ -1,0 +1,106 @@
+# ==========================================
+# Comprehensive .gitignore for Daawatak Monorepo
+# (Laravel Backend + React Frontend + Next.js Admin + Flutter Mobile)
+# ==========================================
+
+# OS & Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Logs and runtime data
+*.log
+*.log.*
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+*.pem
+
+# Dependencies & Build artifacts (Global patterns)
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/out/
+**/.vercel/
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+**/.flutter-plugins*
+**/coverage/
+*.apk
+*.aab
+*.ipa
+
+# ==========================================
+# Backend (Laravel / PHP)
+# ==========================================
+/backend/vendor/
+/backend/.phpunit.result.cache
+/backend/.phpunit.cache
+/backend/auth.json
+/backend/public/build/
+/backend/public/hot
+/backend/public/storage
+/backend/storage/*.key
+/backend/storage/framework/cache/data/*
+!/backend/storage/framework/cache/data/.gitignore
+/backend/storage/framework/sessions/*
+!/backend/storage/framework/sessions/.gitignore
+/backend/storage/framework/views/*
+!/backend/storage/framework/views/.gitignore
+/backend/storage/framework/testing/*
+!/backend/storage/framework/testing/.gitignore
+/backend/storage/logs/*.log
+/backend/storage/pail/
+/backend/Homestead.json
+/backend/Homestead.yaml
+
+# ==========================================
+# Frontend (React / Vite)
+# ==========================================
+/frontend/.yarn/cache/
+/frontend/.yarn/unplugged/
+/frontend/.pnp.*
+
+# ==========================================
+# Admin (Next.js)
+# ==========================================
+/admin/*.tsbuildinfo
+
+# ==========================================
+# Mobile (Flutter / Dart)
+# ==========================================
+/Flutter/*.iml
+/Flutter/android/app/debug/
+/Flutter/android/app/profile/
+/Flutter/android/app/release/
+/Flutter/ios/Flutter/.last_build_id
+/Flutter/**/doc/api/
+/Flutter/app.*.symbols
+/Flutter/app.*.map.json

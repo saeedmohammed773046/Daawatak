@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <linearGradient id="goldLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4AF37"/>
+      <stop offset="50%" stop-color="#F3E5AB"/>
+      <stop offset="100%" stop-color="#AA7C11"/>
+    </linearGradient>
+    <linearGradient id="primaryLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <filter id="shadowLight" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- Logo Mark Icon (Envelope & Luxury Crown / Star Motif) -->
+  <g transform="translate(10, 10)">
+    <!-- Outer Envelope Frame -->
+    <rect x="15" y="25" width="70" height="50" rx="10" fill="url(#primaryLight)" filter="url(#shadowLight)"/>
+    <!-- Envelope Flap / Calligraphy Bow -->
+    <path d="M15 35 L50 60 L85 35" stroke="url(#goldLight)" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Gold Crown/Sparkle on Envelope -->
+    <path d="M50 15 L54 24 L63 25 L56 31 L58 40 L50 35 L42 40 L44 31 L37 25 L46 24 Z" fill="url(#goldLight)"/>
+    <!-- Inner Accent Line -->
+    <circle cx="50" cy="50" r="4" fill="url(#goldLight)"/>
+  </g>
+
+  <!-- Brand Name Typography (Arabic & English) -->
+  <!-- Arabic Text -->
+  <text x="110" y="58" font-family="'Segoe UI', 'Tajawal', 'Cairo', sans-serif" font-size="34" font-weight="800" fill="#0F172A" letter-spacing="0">
+    دَعْوَتُكَ
+  </text>
+  <!-- English Subtitle / Tagline -->
+  <text x="112" y="82" font-family="'Inter', 'Montserrat', sans-serif" font-size="13" font-weight="600" fill="#D4AF37" letter-spacing="3">
+    DAAWATAK • VIP EVENTS
+  </text>
+</svg>
