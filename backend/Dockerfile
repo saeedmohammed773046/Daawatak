@@ -30,7 +30,8 @@ WORKDIR /var/www
 
 # Copy composer files first for layer caching
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
+RUN composer config -g process-timeout 2000 \
+    && (composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction || composer install --no-dev --no-scripts --no-autoloader --prefer-source --no-interaction)
 
 # Copy application code
 COPY . .
