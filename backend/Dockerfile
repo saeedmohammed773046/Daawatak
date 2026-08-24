@@ -11,7 +11,7 @@ RUN apk add --no-cache \
     postgresql-dev \
     oniguruma-dev
 
-# Install PHP extensions
+# Install PHP extensions for Laravel & PostgreSQL
 RUN docker-php-ext-install \
     pdo \
     pdo_pgsql \
@@ -19,10 +19,8 @@ RUN docker-php-ext-install \
     mbstring \
     xml \
     bcmath \
-    pcntl
-
-# Install Redis extension
-RUN pecl install redis && docker-php-ext-enable redis
+    pcntl \
+    opcache
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
