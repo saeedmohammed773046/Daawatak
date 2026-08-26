@@ -39,28 +39,15 @@ const colorPresets = [
   ['#831843', '#f5d0c5'],
 ]
 
-export default function InvitationDesignerPage() {
-  const { t, locale } = useI18n()
-  const isAr = locale === 'ar'
-  const [params] = useSearchParams()
-  const navigate = useNavigate()
-  const eventId = params.get('eventId') || 'event-1'
-  const [design, setDesign] = useState<InvitationDesign>(defaultInvitationDesign)
-  const [saving, setSaving] = useState(false)
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
+interface ControlsPanelProps {
+  design: InvitationDesign
+  update: <K extends keyof InvitationDesign>(key: K, value: InvitationDesign[K]) => void
+  isAr: boolean
+  t: any
+}
 
-  function update<K extends keyof InvitationDesign>(key: K, value: InvitationDesign[K]) {
-    setDesign((d) => ({ ...d, [key]: value }))
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    await new Promise((r) => setTimeout(r, 600))
-    setSaving(false)
-    toast.success(isAr ? 'تم حفظ تصميم الدعوة بنجاح' : 'Invitation design saved successfully')
-  }
-
-  const ControlsPanel = () => (
+function ControlsPanel({ design, update, isAr, t }: ControlsPanelProps) {
+  return (
     <Tabs defaultValue="content" className="flex flex-col gap-4">
       <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="content"><Type className="h-4 w-4" /></TabsTrigger>
@@ -72,30 +59,51 @@ export default function InvitationDesignerPage() {
       <TabsContent value="content" className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label>{isAr ? 'عنوان المناسبة' : 'Event Title'}</Label>
-          <Input value={design.eventTitle} onChange={(e) => update('eventTitle', e.target.value)} />
+          <Input
+            value={design.eventTitle}
+            onChange={(e) => update('eventTitle', e.target.value)}
+            placeholder={isAr ? 'مثال: حفل زفاف' : 'e.g. Wedding Ceremony'}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label>{isAr ? 'أسماء أصحاب المناسبة' : 'Hosts / Names'}</Label>
-          <Input value={design.eventNames} onChange={(e) => update('eventNames', e.target.value)} />
+          <Input
+            value={design.eventNames}
+            onChange={(e) => update('eventNames', e.target.value)}
+            placeholder={isAr ? 'مثال: أحمد & سارة' : 'e.g. Ahmed & Sara'}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label>{isAr ? 'نص الدعوة' : 'Invitation Message'}</Label>
-          <Textarea value={design.bodyText} onChange={(e) => update('bodyText', e.target.value)} />
+          <Textarea
+            value={design.bodyText}
+            onChange={(e) => update('bodyText', e.target.value)}
+            rows={3}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label>{t.common.date} {isAr ? 'والوقت' : '& Time'}</Label>
-          <Input value={design.date} onChange={(e) => update('date', e.target.value)} />
+          <Input
+            value={design.date}
+            onChange={(e) => update('date', e.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label>{t.common.location}</Label>
-          <Input value={design.venue} onChange={(e) => update('venue', e.target.value)} />
+          <Input
+            value={design.venue}
+            onChange={(e) => update('venue', e.target.value)}
+          />
         </div>
       </TabsContent>
 
       <TabsContent value="text" className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <Label>{isAr ? 'اسم المدعو (معاينة)' : 'Guest Name (Preview)'}</Label>
-          <Input value={design.guestName} onChange={(e) => update('guestName', e.target.value)} />
+          <Input
+            value={design.guestName}
+            onChange={(e) => update('guestName', e.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label>{isAr ? `حجم خط اسم المدعو: ${design.guestNameSize}px` : `Guest Name Font Size: ${design.guestNameSize}px`}</Label>
@@ -115,6 +123,7 @@ export default function InvitationDesignerPage() {
             ].map(({ key, icon: Icon }) => (
               <button
                 key={key}
+                type="button"
                 onClick={() => update('guestNameAlign', key as any)}
                 className={cn(
                   'flex h-10 flex-1 items-center justify-center rounded-lg border transition-colors',
@@ -149,6 +158,7 @@ export default function InvitationDesignerPage() {
             {colorPresets.map(([p, s], i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => { update('primaryColor', p); update('secondaryColor', s) }}
                 className="h-9 w-9 rounded-full border-2 border-white shadow-soft ring-1 ring-border"
                 style={{ background: `linear-gradient(135deg, ${p}, ${s})` }}
@@ -171,6 +181,28 @@ export default function InvitationDesignerPage() {
       </TabsContent>
     </Tabs>
   )
+}
+
+export default function InvitationDesignerPage() {
+  const { t, locale } = useI18n()
+  const isAr = locale === 'ar'
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const eventId = params.get('eventId') || 'event-1'
+  const [design, setDesign] = useState<InvitationDesign>(defaultInvitationDesign)
+  const [saving, setSaving] = useState(false)
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
+
+  function update<K extends keyof InvitationDesign>(key: K, value: InvitationDesign[K]) {
+    setDesign((d) => ({ ...d, [key]: value }))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    await new Promise((r) => setTimeout(r, 600))
+    setSaving(false)
+    toast.success(isAr ? 'تم حفظ تصميم الدعوة بنجاح' : 'Invitation design saved successfully')
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -195,7 +227,7 @@ export default function InvitationDesignerPage() {
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <div className="hidden rounded-xl border border-border/70 bg-card p-5 lg:block">
-          <ControlsPanel />
+          <ControlsPanel design={design} update={update} isAr={isAr} t={t} />
         </div>
 
         <div className="flex flex-col items-center gap-4">
@@ -213,7 +245,7 @@ export default function InvitationDesignerPage() {
           <DialogHeader>
             <DialogTitle>{isAr ? 'خيارات التصميم' : 'Design Controls'}</DialogTitle>
           </DialogHeader>
-          <ControlsPanel />
+          <ControlsPanel design={design} update={update} isAr={isAr} t={t} />
         </DialogContent>
       </Dialog>
     </div>
