@@ -185,42 +185,45 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Logo & Title
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.12),
-                  border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4), width: 2),
-                ),
-                child: const Icon(
-                  Icons.qr_code_scanner_rounded,
-                  size: 42,
-                  color: Color(0xFFD4AF37),
+              Center(
+                child: Image.asset(
+                  'assets/images/logo_vertical_transparent.png',
+                  height: 110,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.12),
+                      border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4), width: 2),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner_rounded, size: 42, color: Color(0xFFD4AF37)),
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               const Text(
-                'دعوتك',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'بوابة موظفي الاستقبال ومسح التذاكر',
+                'بوابة موظف الاستقبال والتحقق',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w500,
+                  color: Color(0xFFD4AF37),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 4),
+              const Text(
+                'أدخل كلمة المرور الخاصة بك أو رمز حماية الفعالية للبدء في مسح التذاكر',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
 
               // Card Container
               Container(

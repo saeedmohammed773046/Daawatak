@@ -145,8 +145,8 @@ export function ReceptionistsTab({ event, onEventUpdate }: ReceptionistsTabProps
     let message = ''
     if (staff) {
       message = isAr
-        ? `بيانات الدخول لتطبيق موظف الاستقبال (تطبيق دعوتك):\nالمناسبة: ${event.title}\nالموظف: ${staff.name}\nكلمة المرور للدخول: ${staff.password || currentPin}`
-        : `Daawatak Reception App Login:\nEvent: ${event.title}\nStaff: ${staff.name}\nPassword: ${staff.password || currentPin}`
+        ? `بيانات الدخول لتطبيق موظف الاستقبال (تطبيق دعوتك):\nالمناسبة: ${event.title}\nالموظف: ${staff.name}\nالمعرّف / الحساب: ${staff.email || '-'}\nكلمة المرور للدخول: ${staff.password || currentPin}`
+        : `Daawatak Reception App Login:\nEvent: ${event.title}\nStaff: ${staff.name}\nUsername: ${staff.email || '-'}\nPassword: ${staff.password || currentPin}`
     } else {
       message = isAr
         ? `بيانات الدخول لتطبيق موظف الاستقبال (تطبيق دعوتك):\nالمناسبة: ${event.title}\nرمز حماية الفعالية (Event PIN): ${currentPin}`
@@ -267,12 +267,12 @@ export function ReceptionistsTab({ event, onEventUpdate }: ReceptionistsTabProps
               <Users className="h-5 w-5 text-primary" />
               <div>
                 <CardTitle className="text-base font-bold sm:text-lg">
-                  {isAr ? 'موظفو الاستقبال المعينون' : 'Assigned Reception Staff'}
+                  {isAr ? 'موظفو الاستقبال المعينون للفعالية' : 'Assigned Reception Staff'}
                 </CardTitle>
                 <CardDescription className="text-xs">
                   {isAr
-                    ? 'أضف موظفاً وحدد له كلمة مرور خاصة ليدخل بها على تطبيق الهاتف لمسح التذاكر.'
-                    : 'Add designated gate operators with individual passwords to scan tickets on mobile.'}
+                    ? 'الحسابات والموظفون المصرح لهم بالدخول إلى هذه المناسبة عبر تطبيق الهاتف لمسح التذاكر.'
+                    : 'Authorized accounts permitted to log into this event on the mobile app to scan passes.'}
                 </CardDescription>
               </div>
             </div>
@@ -309,6 +309,7 @@ export function ReceptionistsTab({ event, onEventUpdate }: ReceptionistsTabProps
                 <thead className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-start">{isAr ? 'اسم الموظف / البوابة' : 'Staff Name'}</th>
+                    <th className="px-4 py-3 text-start">{isAr ? 'المعرّف / الحساب' : 'Account / Identifier'}</th>
                     <th className="px-4 py-3 text-start">{isAr ? 'كلمة المرور' : 'Password'}</th>
                     <th className="px-4 py-3 text-start">{isAr ? 'الحالة' : 'Status'}</th>
                     <th className="px-4 py-3 text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
@@ -329,6 +330,9 @@ export function ReceptionistsTab({ event, onEventUpdate }: ReceptionistsTabProps
                             </p>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
+                        {staff.email || '-'}
                       </td>
                       <td className="px-4 py-3.5 font-mono text-xs">
                         <span className="rounded bg-muted px-2 py-1 text-primary font-bold">
@@ -351,7 +355,7 @@ export function ReceptionistsTab({ event, onEventUpdate }: ReceptionistsTabProps
                             title={isAr ? 'نسخ بيانات الدخول للموظف' : 'Copy Credentials'}
                           >
                             <Copy className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">{isAr ? 'نسخ كلمة المرور' : 'Copy'}</span>
+                            <span className="hidden sm:inline">{isAr ? 'نسخ بيانات الدخول' : 'Copy'}</span>
                           </Button>
                           <Button
                             variant="ghost"

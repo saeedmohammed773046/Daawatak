@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://daawatak.onrender.com/api/v1";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://daawatak.onrender.com/api/v1";
 
 function getHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : "";

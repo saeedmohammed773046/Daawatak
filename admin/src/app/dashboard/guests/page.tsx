@@ -6,7 +6,7 @@ import {
   Search, Plus, Trash2, Upload, Download, Eye, Send, FileCode,
   CheckCircle2, XCircle, Clock, Users, ChevronUp, ChevronDown, AlertCircle, RefreshCw, FileText
 } from "lucide-react";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, API_URL } from "@/lib/api";
 
 interface Guest {
   id: string;

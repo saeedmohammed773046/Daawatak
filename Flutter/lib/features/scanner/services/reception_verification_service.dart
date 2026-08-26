@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network_client.dart';
 import '../models/verification_result.dart';
 
@@ -58,70 +56,5 @@ class ReceptionVerificationService {
         details: 'حدث خطأ أثناء الاتصال بالخادم: $e',
       );
     }
-  }
-
-  Future<void> _queueOfflineScan(String eventId, String token, String deviceInfo) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = 'offline_scans_queue_$eventId';
-      final queueJson = prefs.getStringList(key) ?? [];
-
-      queueJson.add(jsonEncode({
-        'token': token,
-        'timestamp': DateTime.now().toIso8601String(),
-        'device_info': deviceInfo,
-      }));
-
-      await prefs.setStringList(key, queueJson);
-    } catch (_) {}
-  }
-
-  /// Get number of pending scans saved locally
-  Future<int> getPendingQueueCount(String eventId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = 'offline_scans_queue_$eventId';
-      final queueJson = prefs.getStringList(key) ?? [];
-      return queueJson.length;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  /// Sync locally cached scans with the server
-  Future<int> syncOfflineScans(String eventId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'offline_scans_queue_$eventId';
-    final queueJson = prefs.getStringList(key) ?? [];
-
-    if (queueJson.isEmpty) return 0;
-
-    final List<String> remaining = [];
-    int syncedSuccessfully = 0;
-
-    for (final itemStr in queueJson) {
-      try {
-        final item = jsonDecode(itemStr) as Map<String, dynamic>;
-        final response = await _networkClient.dio.post(
-          '/reception/verify',
-          data: {
-            'event_id': eventId,
-            'token': item['token'],
-            'device_info': item['device_info'] ?? 'Offline Sync Terminal',
-          },
-        );
-
-        if (response.data['success'] == true) {
-          syncedSuccessfully++;
-        } else {
-          remaining.add(itemStr);
-        }
-      } catch (e) {
-        remaining.add(itemStr); // Keep in queue for next sync retry
-      }
-    }
-
-    await prefs.setStringList(key, remaining);
-    return syncedSuccessfully;
   }
 }

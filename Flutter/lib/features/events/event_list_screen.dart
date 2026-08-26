@@ -190,106 +190,258 @@ class _EventListScreenState extends State<EventListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
-        title: const Text('الفعاليات الخاصة بك'),
+        backgroundColor: const Color(0xFF10131B),
+        elevation: 0,
+        centerTitle: false,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/logo_vertical_transparent.png',
+              height: 36,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(Icons.event_available, color: Color(0xFFD4AF37)),
+            ),
+            const SizedBox(width: 10),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'فعاليات الاستقبال',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                Text(
+                  'اختر المناسبة لبدء المسح',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Color(0xFFD4AF37)),
             onPressed: _fetchEvents,
+            tooltip: 'تحديث الفعاليات',
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.white60),
             onPressed: () => context.go('/login'),
-          )
+            tooltip: 'تسجيل الخروج',
+          ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFFD4AF37)),
+                  SizedBox(height: 16),
+                  Text('جاري تحميل الفعاليات...', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            )
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off, size: 48, color: Colors.redAccent),
+                        const SizedBox(height: 12),
+                        Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.redAccent, fontSize: 14)),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _fetchEvents,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('إعادة المحاولة'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : _events.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'لا توجد فعاليات نشطة مخصصة لك حالياً.',
-                        style: TextStyle(color: Color(0xFF64748B)),
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(28.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.event_busy, size: 48, color: Color(0xFFD4AF37)),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'لا توجد فعاليات نشطة مسندة لحسابك',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'يرجى التأكد من منظم المناسبة لإضافتك إلى فريق الاستقبال أو استخدم رمز الحماية المباشر للفعالية.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.5),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: _fetchEvents,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('تحديث القائمة'),
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                       itemCount: _events.length,
                       itemBuilder: (context, index) {
                         final event = _events[index];
                         final accessPin = event['access_pin'] ?? '123456';
-                        return Card(
+                        return Container(
                           margin: const EdgeInsets.only(bottom: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: Colors.white10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF141824), Color(0xFF0F1219)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.25)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          color: const Color(0xFF121620),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => _showPinVerificationDialog(event),
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          event['title'] ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => _showPinVerificationDialog(event),
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFD4AF37).withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          child: const Icon(Icons.celebration, color: Color(0xFFD4AF37), size: 22),
                                         ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                event['title'] ?? 'المناسبة',
+                                                style: const TextStyle(
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'المنظم: ${event['user']?['name'] ?? 'منظم الفعالية'}',
+                                                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.lock, size: 12, color: Color(0xFFD4AF37)),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'رمز: $accessPin',
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.shield_outlined, size: 12, color: Color(0xFFD4AF37)),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                accessPin,
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    const Divider(color: Colors.white10, height: 1),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.calendar_month, size: 14, color: Color(0xFFD4AF37)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          event['event_date'] ?? 'اليوم',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                        ),
+                                        if (event['venue'] != null && event['venue'].toString().isNotEmpty) ...[
+                                          const SizedBox(width: 16),
+                                          const Icon(Icons.location_on, size: 14, color: Color(0xFFD4AF37)),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              event['venue'],
+                                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    // Scan direct action button
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD4AF37),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.calendar_today, size: 14, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 6),
-                                      Text(event['event_date'] ?? '', style: const TextStyle(color: Color(0xFF64748B))),
-                                      const SizedBox(width: 16),
-                                      const Icon(Icons.location_on, size: 14, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          event['venue'] ?? '',
-                                          style: const TextStyle(color: Color(0xFF64748B)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                      child: const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF0B0E14)),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'دخول ومسح التذاكر (QR)',
+                                            style: TextStyle(
+                                              color: Color(0xFF0B0E14),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  )
-                                ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),

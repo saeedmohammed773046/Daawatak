@@ -32,43 +32,55 @@ class ScannerScreen extends StatefulWidget {
 
 class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserver {
   final ReceptionVerificationService _verificationService = ReceptionVerificationService();
-  late MobileScannerController _scannerController;
+  MobileScannerController? _scannerController;
 
   CameraPermissionState _permissionState = CameraPermissionState.checking;
   String? _cameraErrorMessage;
   bool _isProcessing = false;
   bool _isTorchOn = false;
-  int _pendingSyncCount = 0;
-  bool _isSyncing = false;
   DateTime _lastScannedTimestamp = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _checkAndRequestCameraPermission();
+  }
 
+  void _initScannerController() {
+    try {
+      _scannerController?.dispose();
+    } catch (_) {}
     _scannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
       facing: CameraFacing.back,
       torchEnabled: false,
-      autoStart: false,
+      autoStart: true,
     );
+  }
 
-    _checkAndRequestCameraPermission();
-    _loadPendingQueueCount();
-    _triggerAutoSync();
+  Future<void> _restartScanner() async {
+    setState(() {
+      _permissionState = CameraPermissionState.checking;
+    });
+    try {
+      await _scannerController?.stop();
+      await _scannerController?.dispose();
+    } catch (_) {}
+    _scannerController = null;
+    await _checkAndRequestCameraPermission();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_permissionState != CameraPermissionState.granted) return;
+    if (_permissionState != CameraPermissionState.granted || _scannerController == null) return;
 
     if (state == AppLifecycleState.resumed) {
       if (!_isProcessing) {
-        _scannerController.start();
+        _scannerController?.start().catchError((_) {});
       }
     } else if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      _scannerController.stop();
+      _scannerController?.stop().catchError((_) {});
     }
   }
 
@@ -89,7 +101,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         });
       }
     } else {
-      // Request permission
+      // Request permission directly
       final requestedStatus = await Permission.camera.request();
       if (mounted) {
         if (requestedStatus.isGranted) {
@@ -109,54 +121,11 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
   void _onPermissionGranted() {
     if (mounted) {
+      _initScannerController();
       setState(() {
         _permissionState = CameraPermissionState.granted;
+        _cameraErrorMessage = null;
       });
-      _scannerController.start().catchError((error) {
-        if (mounted) {
-          setState(() {
-            _permissionState = CameraPermissionState.error;
-            _cameraErrorMessage = 'تعذر تشغيل الكاميرا: $error';
-          });
-        }
-      });
-    }
-  }
-
-  Future<void> _loadPendingQueueCount() async {
-    final count = await _verificationService.getPendingQueueCount(widget.eventId);
-    if (mounted) {
-      setState(() {
-        _pendingSyncCount = count;
-      });
-    }
-  }
-
-  Future<void> _triggerAutoSync() async {
-    if (_isSyncing) return;
-
-    setState(() {
-      _isSyncing = true;
-    });
-
-    final synced = await _verificationService.syncOfflineScans(widget.eventId);
-    final count = await _verificationService.getPendingQueueCount(widget.eventId);
-
-    if (mounted) {
-      setState(() {
-        _pendingSyncCount = count;
-        _isSyncing = false;
-      });
-
-      if (synced > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تمت مزامنة $synced عملية دخول بنجاح مع السيرفر!'),
-            backgroundColor: const Color(0xFF0A3D24),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
     }
   }
 
@@ -177,7 +146,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
     _lastScannedTimestamp = now;
 
-    // Haptic Feedback for physical feedback
+    // Haptic Feedback for immediate physical feedback
     try {
       HapticFeedback.mediumImpact();
     } catch (_) {}
@@ -187,9 +156,11 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     });
 
     // Pause scanner during verification
-    await _scannerController.stop();
+    try {
+      await _scannerController?.stop();
+    } catch (_) {}
 
-    // Extract clean token
+    // Extract clean token (supports raw string, URLs, JSON)
     final cleanToken = QrTokenParser.extractToken(rawValue);
 
     if (cleanToken.isEmpty) {
@@ -199,7 +170,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       return;
     }
 
-    // Call Verification API
+    // Call Verification API strictly online
     final result = await _verificationService.verifyToken(
       eventId: widget.eventId,
       token: cleanToken,
@@ -218,15 +189,16 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         setState(() {
           _isProcessing = false;
         });
-        _scannerController.start();
-        _loadPendingQueueCount();
+        try {
+          _scannerController?.start();
+        } catch (_) {}
       }
     });
   }
 
   void _toggleTorch() async {
     try {
-      await _scannerController.toggleTorch();
+      await _scannerController?.toggleTorch();
       setState(() {
         _isTorchOn = !_isTorchOn;
       });
@@ -235,14 +207,16 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
   void _switchCamera() async {
     try {
-      await _scannerController.switchCamera();
+      await _scannerController?.switchCamera();
     } catch (_) {}
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _scannerController.dispose();
+    try {
+      _scannerController?.dispose();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -251,34 +225,71 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     return Scaffold(
       backgroundColor: const Color(0xFF0B0E14),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0E14),
+        backgroundColor: const Color(0xFF10131B),
         elevation: 0,
-        centerTitle: true,
-        title: Text(
-          widget.eventName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        centerTitle: false,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/logo_vertical_transparent.png',
+              height: 32,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.eventName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Text(
+                    'مسح وتحقق فوري (Daawatak)',
+                    style: TextStyle(
+                      color: Color(0xFFD4AF37),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              _pendingSyncCount > 0 ? Icons.sync_problem : Icons.cloud_done,
-              color: _pendingSyncCount > 0 ? Colors.amber : const Color(0xFF25D366),
+            icon: const Icon(
+              Icons.cloud_done,
+              color: Color(0xFF25D366),
+              size: 20,
             ),
-            onPressed: _triggerAutoSync,
-            tooltip: 'حالة المزامنة',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('الخادم متصل — التحقق مباشر وآمن'),
+                  backgroundColor: Color(0xFF0A3D24),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            tooltip: 'حالة الاتصال بالسيرفر',
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Body content based on permission & camera state
+          // Main Scanner Body
           _buildMainScannerBody(),
 
-          // Top Connection / Sync Status Banner
+          // Top Connection Status Banner
           Positioned(
             top: 12,
             left: 16,
@@ -342,31 +353,20 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white12),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Icon(
-            _pendingSyncCount > 0 ? Icons.wifi_off : Icons.wifi,
+            Icons.wifi,
             size: 16,
-            color: _pendingSyncCount > 0 ? Colors.amber : const Color(0xFF25D366),
+            color: Color(0xFF25D366),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: Text(
-              _pendingSyncCount > 0
-                  ? 'يوجد $_pendingSyncCount عملية معلقة للمزامنة مع السيرفر'
-                  : 'متصل بالسيرفر — المزامنة فورية',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              'متصل بالسيرفر — المزامنة فورية',
+              style: TextStyle(color: Colors.white, fontSize: 12),
             ),
           ),
-          if (_isSyncing)
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Color(0xFFD4AF37),
-              ),
-            ),
         ],
       ),
     );
@@ -564,13 +564,16 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                           style: const TextStyle(color: Colors.white54, fontSize: 12),
                         ),
                         const SizedBox(height: 16),
-                        ElevatedButton(
+                        ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFD4AF37),
                             foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          onPressed: () => _scannerController.start(),
-                          child: const Text('إعادة تشغيل الكاميرا'),
+                          onPressed: _restartScanner,
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('إعادة تشغيل الكاميرا', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),

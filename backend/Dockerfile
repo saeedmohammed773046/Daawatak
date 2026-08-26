@@ -25,13 +25,23 @@ RUN docker-php-ext-install \
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# Environment configuration for Composer
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_NO_INTERACTION=1 \
+    COMPOSER_MEMORY_LIMIT=-1 \
+    COMPOSER_PROCESS_TIMEOUT=3600
+
 # Set working directory
 WORKDIR /var/www
 
 # Copy composer files first for layer caching
 COPY composer.json composer.lock ./
-RUN composer config -g process-timeout 2000 \
-    && (composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction || composer install --no-dev --no-scripts --no-autoloader --prefer-source --no-interaction)
+
+# Install dependencies with timeout extension and automatic retry / fallback
+RUN composer config -g process-timeout 3600 \
+    && (composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction || \
+        (sleep 5 && composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction) || \
+        composer install --no-dev --no-scripts --no-autoloader --prefer-source --no-interaction)
 
 # Copy application code
 COPY . .
