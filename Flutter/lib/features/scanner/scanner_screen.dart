@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +17,15 @@ enum CameraPermissionState {
   error,
 }
 
+enum CameraFailureType {
+  none,
+  permissionError,
+  cameraBusy,
+  cameraUnavailable,
+  initializationError,
+  genericError,
+}
+
 class ScannerScreen extends StatefulWidget {
   final String eventId;
   final String eventName;
@@ -32,12 +42,18 @@ class ScannerScreen extends StatefulWidget {
 
 class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserver {
   final ReceptionVerificationService _verificationService = ReceptionVerificationService();
-  MobileScannerController? _scannerController;
+  
+  // Single Controller instance per scanner lifecycle
+  MobileScannerController? _controller;
 
   CameraPermissionState _permissionState = CameraPermissionState.checking;
-  String? _cameraErrorMessage;
+  CameraFailureType _failureType = CameraFailureType.none;
+  String? _detailedErrorMessage;
+  
   bool _isProcessing = false;
   bool _isTorchOn = false;
+  bool _isRestarting = false;
+  double _currentZoom = 0.0;
   DateTime _lastScannedTimestamp = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
@@ -47,67 +63,60 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     _checkAndRequestCameraPermission();
   }
 
-  void _initScannerController() {
-    try {
-      _scannerController?.dispose();
-    } catch (_) {}
+  /// Create and configure the single MobileScannerController
+  void _createController() {
+    _disposeController();
 
-    _scannerController = MobileScannerController(
+    _controller = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
       facing: CameraFacing.back,
       torchEnabled: false,
-      autoStart: false,
-      cameraResolution: const Size(1280, 720),
+      autoStart: true,
+      formats: const [BarcodeFormat.qrCode],
     );
-
-    // Safely start after the widget frame is rendered
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _permissionState == CameraPermissionState.granted) {
-        _safeStartController();
-      }
-    });
   }
 
-  Future<void> _safeStartController() async {
+  void _disposeController() {
     try {
-      await _scannerController?.start();
+      _controller?.dispose();
     } catch (e) {
-      debugPrint('MobileScanner start error: $e');
+      debugPrint('[ScannerScreen] Error disposing controller: $e');
     }
-  }
-
-  Future<void> _restartScanner() async {
-    setState(() {
-      _permissionState = CameraPermissionState.checking;
-      _cameraErrorMessage = null;
-    });
-    try {
-      await _scannerController?.stop();
-      await _scannerController?.dispose();
-    } catch (_) {}
-    _scannerController = null;
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _checkAndRequestCameraPermission();
+    _controller = null;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_permissionState != CameraPermissionState.granted || _scannerController == null) return;
+    if (_permissionState != CameraPermissionState.granted) {
+      // If returning from OS App Settings, re-check permission automatically
+      if (state == AppLifecycleState.resumed) {
+        _checkAndRequestCameraPermission(silent: true);
+      }
+      return;
+    }
 
     if (state == AppLifecycleState.resumed) {
-      if (!_isProcessing) {
-        _safeStartController();
+      if (!_isProcessing && !_isRestarting && _controller != null) {
+        _controller?.start().catchError((e) {
+          debugPrint('[ScannerScreen] Resume start error: $e');
+        });
       }
     } else if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      _scannerController?.stop().catchError((_) {});
+      _controller?.stop().catchError((e) {
+        debugPrint('[ScannerScreen] Pause stop error: $e');
+      });
     }
   }
 
-  Future<void> _checkAndRequestCameraPermission() async {
-    setState(() {
-      _permissionState = CameraPermissionState.checking;
-      _cameraErrorMessage = null;
-    });
+  /// Production-Ready Permission Check & Request Workflow
+  Future<void> _checkAndRequestCameraPermission({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _permissionState = CameraPermissionState.checking;
+        _failureType = CameraFailureType.none;
+        _detailedErrorMessage = null;
+      });
+    }
 
     try {
       final status = await Permission.camera.status;
@@ -118,30 +127,34 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         if (mounted) {
           setState(() {
             _permissionState = CameraPermissionState.permanentlyDenied;
+            _failureType = CameraFailureType.permissionError;
           });
         }
       } else {
-        // Request permission explicitly from the OS
-        final requestedStatus = await Permission.camera.request();
+        final requested = await Permission.camera.request();
         if (mounted) {
-          if (requestedStatus.isGranted) {
+          if (requested.isGranted) {
             _onPermissionGranted();
-          } else if (requestedStatus.isPermanentlyDenied) {
+          } else if (requested.isPermanentlyDenied) {
             setState(() {
               _permissionState = CameraPermissionState.permanentlyDenied;
+              _failureType = CameraFailureType.permissionError;
             });
           } else {
             setState(() {
               _permissionState = CameraPermissionState.denied;
+              _failureType = CameraFailureType.permissionError;
             });
           }
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[ScannerScreen] Permission Exception: $e\n$stackTrace');
       if (mounted) {
         setState(() {
           _permissionState = CameraPermissionState.error;
-          _cameraErrorMessage = e.toString();
+          _failureType = CameraFailureType.initializationError;
+          _detailedErrorMessage = e.toString();
         });
       }
     }
@@ -149,16 +162,77 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
   void _onPermissionGranted() {
     if (mounted) {
-      _initScannerController();
+      _createController();
       setState(() {
         _permissionState = CameraPermissionState.granted;
-        _cameraErrorMessage = null;
+        _failureType = CameraFailureType.none;
+        _detailedErrorMessage = null;
       });
     }
   }
 
+  /// Robust Restart System (Prevents Race Conditions)
+  Future<void> _restartScanner() async {
+    if (_isRestarting) return;
+    _isRestarting = true;
+
+    setState(() {
+      _permissionState = CameraPermissionState.checking;
+      _failureType = CameraFailureType.none;
+      _detailedErrorMessage = null;
+    });
+
+    try {
+      await _controller?.stop();
+    } catch (_) {}
+
+    _disposeController();
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    if (mounted) {
+      await _checkAndRequestCameraPermission();
+    }
+    _isRestarting = false;
+  }
+
+  /// Classify native & plugin errors for precise diagnostic feedback
+  void _handleScannerError(MobileScannerException error) {
+    debugPrint('[ScannerScreen] MobileScannerException: ${error.errorCode} - ${error.errorDetails?.message}');
+
+    CameraFailureType type = CameraFailureType.genericError;
+    String message = 'حدث خطأ غير متوقع أثناء تشغيل الكاميرا.';
+
+    switch (error.errorCode) {
+      case MobileScannerErrorCode.permissionDenied:
+        type = CameraFailureType.permissionError;
+        message = 'صلاحية الكاميرا غير مفعلة في نظام الهاتف.';
+        break;
+      case MobileScannerErrorCode.unsupported:
+        type = CameraFailureType.cameraUnavailable;
+        message = 'كاميرا الجهاز غير مدعومة أو غير متوفرة.';
+        break;
+      case MobileScannerErrorCode.controllerAlreadyInitialized:
+      case MobileScannerErrorCode.controllerDisposed:
+        type = CameraFailureType.initializationError;
+        message = 'تعذر تهيئة مشغل الكاميرا بنجاح.';
+        break;
+      case MobileScannerErrorCode.genericError:
+      default:
+        type = CameraFailureType.genericError;
+        message = error.errorDetails?.message ?? 'تعذر بدء بث الكاميرا (يرجى التحقق من عدم استخدام الكاميرا من تطبيق آخر).';
+        break;
+    }
+
+    if (mounted) {
+      setState(() {
+        _failureType = type;
+        _detailedErrorMessage = message;
+      });
+    }
+  }
+
+  /// Handle QR Detection strictly and atomically
   Future<void> _onDetect(BarcodeCapture capture) async {
-    // Guard against multiple simultaneous scan invocations
     if (_isProcessing) return;
 
     final now = DateTime.now();
@@ -174,7 +248,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
     _lastScannedTimestamp = now;
 
-    // Audio & Haptic feedback on scan detection
+    // Instant Audio & Haptic Feedback on scan
     try {
       SystemSound.play(SystemSoundType.click);
       HapticFeedback.mediumImpact();
@@ -184,12 +258,11 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       _isProcessing = true;
     });
 
-    // Pause scanner during verification
+    // Pause camera during server verification
     try {
-      await _scannerController?.stop();
+      await _controller?.stop();
     } catch (_) {}
 
-    // Extract clean token (supports raw string, URLs, JSON)
     final cleanToken = QrTokenParser.extractToken(rawValue);
 
     if (cleanToken.isEmpty) {
@@ -203,7 +276,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     final result = await _verificationService.verifyToken(
       eventId: widget.eventId,
       token: cleanToken,
-      deviceInfo: 'Android/iOS Reception Terminal',
+      deviceInfo: 'Android Reception Terminal',
     );
 
     if (mounted) {
@@ -213,41 +286,58 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
   void _navigateToResult(VerificationResultData result) {
     context.push('/result', extra: result).then((_) {
-      // When returning from Result Screen ("مسح QR آخر"):
       if (mounted) {
         setState(() {
           _isProcessing = false;
         });
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted && !_isProcessing) {
-            _safeStartController();
+        Future.delayed(const Duration(milliseconds: 250), () {
+          if (mounted && !_isProcessing && _controller != null) {
+            _controller?.start().catchError((e) {
+              debugPrint('[ScannerScreen] Restart after result error: $e');
+            });
           }
         });
       }
     });
   }
 
-  void _toggleTorch() async {
+  Future<void> _toggleTorch() async {
+    if (_controller == null) return;
     try {
-      await _scannerController?.toggleTorch();
+      await _controller!.toggleTorch();
       setState(() {
         _isTorchOn = !_isTorchOn;
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ScannerScreen] Toggle torch error: $e');
+    }
   }
 
-  void _switchCamera() async {
+  Future<void> _switchCamera() async {
+    if (_controller == null) return;
     try {
-      await _scannerController?.switchCamera();
-    } catch (_) {}
+      await _controller!.switchCamera();
+    } catch (e) {
+      debugPrint('[ScannerScreen] Switch camera error: $e');
+    }
+  }
+
+  Future<void> _setZoom(double zoom) async {
+    if (_controller == null) return;
+    try {
+      await _controller!.setZoomScale(zoom);
+      setState(() {
+        _currentZoom = zoom;
+      });
+    } catch (e) {
+      debugPrint('[ScannerScreen] Set zoom error: $e');
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    try {
-      _scannerController?.dispose();
-    } catch (_) {}
+    _disposeController();
     super.dispose();
   }
 
@@ -317,8 +407,8 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       ),
       body: Stack(
         children: [
-          // Main Scanner Body
-          _buildMainScannerBody(),
+          // Main Camera / Permission Body
+          _buildBody(),
 
           // Top Connection Status Banner
           Positioned(
@@ -328,17 +418,48 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
             child: _buildStatusBar(),
           ),
 
+          // Zoom control slider (when camera is live)
+          if (_permissionState == CameraPermissionState.granted && _failureType == CameraFailureType.none)
+            Positioned(
+              bottom: 90,
+              left: 32,
+              right: 32,
+              child: Row(
+                children: [
+                  const Icon(Icons.zoom_out, color: Color(0xFFD4AF37), size: 18),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: const Color(0xFFD4AF37),
+                        inactiveTrackColor: Colors.white24,
+                        thumbColor: const Color(0xFFD4AF37),
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                      ),
+                      child: Slider(
+                        value: _currentZoom,
+                        min: 0.0,
+                        max: 1.0,
+                        onChanged: _setZoom,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.zoom_in, color: Color(0xFFD4AF37), size: 18),
+                ],
+              ),
+            ),
+
           // Bottom Instruction Label
-          if (_permissionState == CameraPermissionState.granted)
+          if (_permissionState == CameraPermissionState.granted && _failureType == CameraFailureType.none)
             const Positioned(
-              bottom: 48,
+              bottom: 36,
               left: 24,
               right: 24,
               child: Text(
                 'وجه المربع نحو رمز الاستجابة السريعة (QR Code) المتواجد على بطاقة الدعوة للتحقق الفوري',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   height: 1.4,
                 ),
@@ -360,7 +481,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                     ),
                     SizedBox(height: 20),
                     Text(
-                      'جاري التحقق من الدعوة...',
+                      'جاري التحقق من الدعوة عبر السيرفر...',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -380,7 +501,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.75),
+        color: Colors.black.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white12),
       ),
@@ -403,7 +524,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     );
   }
 
-  Widget _buildMainScannerBody() {
+  Widget _buildBody() {
     switch (_permissionState) {
       case CameraPermissionState.checking:
         return const Center(
@@ -413,7 +534,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
               CircularProgressIndicator(color: Color(0xFFD4AF37)),
               SizedBox(height: 16),
               Text(
-                'جاري تشغيل الكاميرا...',
+                'جاري تهيئة الكاميرا...',
                 style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
             ],
@@ -434,16 +555,17 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                 ),
                 const SizedBox(height: 18),
                 const Text(
-                  'إذن الكاميرا مطلوب',
+                  'نحتاج إلى الوصول إلى الكاميرا لمسح رمز QR',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'يحتاج تطبيق "دعوتك" إلى إذن استخدام الكاميرا لمسح بطاقات الدعوة والتحقق من الحضور.',
+                  'يحتاج تطبيق "دعوتك" إلى إذن الكاميرا لمسح بطاقات الدعوة والتحقق من الحضور.',
                   style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
                   textAlign: TextAlign.center,
                 ),
@@ -457,7 +579,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _checkAndRequestCameraPermission,
+                  onPressed: () => _checkAndRequestCameraPermission(),
                   icon: const Icon(Icons.security),
                   label: const Text(
                     'السماح بالكاميرا',
@@ -483,7 +605,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                 ),
                 const SizedBox(height: 18),
                 const Text(
-                  'تم تعطيل إذن الكاميرا',
+                  'تم منع الوصول إلى الكاميرا',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -543,7 +665,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  _cameraErrorMessage ?? 'تعذر الاتصال بمستشعر الكاميرا على الجهاز.',
+                  _detailedErrorMessage ?? 'تعذر الاتصال بمستشعر الكاميرا على الجهاز.',
                   style: const TextStyle(color: Colors.white70, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
@@ -557,7 +679,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _checkAndRequestCameraPermission,
+                  onPressed: _restartScanner,
                   icon: const Icon(Icons.refresh),
                   label: const Text(
                     'إعادة المحاولة',
@@ -570,13 +692,20 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         );
 
       case CameraPermissionState.granted:
+        if (_controller == null) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)));
+        }
+
         return Stack(
+          fit: StackFit.expand,
           children: [
-            // Real Mobile Camera View
+            // Live Camera View
             MobileScanner(
-              controller: _scannerController,
+              controller: _controller,
               onDetect: _onDetect,
+              fit: BoxFit.cover,
               errorBuilder: (context, error, child) {
+                _handleScannerError(error);
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),
@@ -586,15 +715,16 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                         const Icon(Icons.videocam_off, size: 54, color: Color(0xFFD4AF37)),
                         const SizedBox(height: 14),
                         const Text(
-                          'تعذر تشغيل معاينة الكاميرا',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          'تعذر تشغيل الكاميرا',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'رمز الخطأ: ${error.errorCode.name}',
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          _detailedErrorMessage ?? 'رمز الخطأ: ${error.errorCode.name}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFD4AF37),
@@ -613,7 +743,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
               },
             ),
 
-            // Sleek Scanner Frame & Animated Laser Overlay
+            // Live Scanner Overlay with Gold Frame, Animated Laser, Torch & Switch buttons
             ScannerOverlay(
               scanAreaSize: 260.0,
               isTorchOn: _isTorchOn,
