@@ -16,7 +16,23 @@ use App\Http\Controllers\Api\Admin\AdminAuditLogController;
 use App\Http\Middleware\CheckRole;
 use Illuminate\Support\Facades\Route;
 
+// Public Health Check Endpoint for Cron / Monitoring
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now()->toIso8601String(),
+    ], 200);
+});
+
 Route::prefix('v1')->group(function () {
+    // Health Check
+    Route::get('/health', function () {
+        return response()->json([
+            'status' => 'ok',
+            'timestamp' => now()->toIso8601String(),
+        ], 200);
+    });
+
     // Public Auth with Rate Limiting (60 requests per minute)
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register']);

@@ -104,8 +104,15 @@ class ReceptionController extends Controller
             ], 403);
         }
 
+        // Determine if event is on trial/free plan server-side
+        $subscription = \App\Models\Subscription::where('user_id', $event->user_id)
+            ->where('status', 'active')
+            ->where('ends_at', '>=', now())
+            ->first();
+        $isTrial = !$subscription;
+
         // Wrap verification & update in DB transaction with row locking for atomic check-in & race condition prevention
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($eventId, $rawToken, $deviceInfo, $request, $event) {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($eventId, $rawToken, $deviceInfo, $request, $event, $isTrial) {
             $tokenHash = hash('sha256', $rawToken);
 
             // Lookup QR Code with lock
@@ -119,7 +126,12 @@ class ReceptionController extends Controller
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'verification_result' => 'INVALID'
+                        'verification_result' => 'INVALID',
+                        'status' => 'invalid',
+                        'message' => 'رمز QR غير صالح',
+                        'details' => 'لم يتم العثور على دعوة صالحة مرتبطة بهذا الرمز.',
+                        'guest' => null,
+                        'is_trial' => $isTrial,
                     ]
                 ]);
             }
@@ -131,7 +143,12 @@ class ReceptionController extends Controller
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'verification_result' => 'INVALID'
+                        'verification_result' => 'INVALID',
+                        'status' => 'invalid',
+                        'message' => 'رمز QR غير صالح',
+                        'details' => 'لم يتم العثور على دعوة صالحة مرتبطة بهذا الرمز.',
+                        'guest' => null,
+                        'is_trial' => $isTrial,
                     ]
                 ]);
             }
@@ -152,7 +169,15 @@ class ReceptionController extends Controller
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'verification_result' => 'EXPIRED'
+                        'verification_result' => 'EXPIRED',
+                        'status' => 'expired',
+                        'message' => 'دعوة منتهية الصلاحية',
+                        'details' => 'تاريخ أو وقت هذه الفعالية قد انتهى مسبقاً.',
+                        'guest' => [
+                            'name' => $guest->name,
+                            'phone' => $guest->phone,
+                        ],
+                        'is_trial' => false,
                     ]
                 ]);
             }
@@ -172,7 +197,17 @@ class ReceptionController extends Controller
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'verification_result' => 'ALREADY_USED'
+                        'verification_result' => 'ALREADY_USED',
+                        'status' => 'already_used',
+                        'message' => 'مستخدم مسبقاً',
+                        'details' => 'تم استخدام هذه الدعوة مسبقًا ولا يمكن استخدامها مرة أخرى.',
+                        'guest' => [
+                            'name' => $guest->name,
+                            'phone' => $guest->phone,
+                            'companions_count' => $guest->companions_count,
+                            'table_number' => $guest->table_number ?? null,
+                        ],
+                        'is_trial' => false,
                     ]
                 ]);
             }
@@ -199,7 +234,17 @@ class ReceptionController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'verification_result' => 'ACCEPTED'
+                    'verification_result' => 'ACCEPTED',
+                    'status' => 'accepted',
+                    'message' => 'دخول مقبول',
+                    'details' => 'تم تسجيل دخول الضيف بنجاح.',
+                    'guest' => [
+                        'name' => $guest->name,
+                        'phone' => $guest->phone,
+                        'companions_count' => $guest->companions_count,
+                        'table_number' => $guest->table_number ?? null,
+                    ],
+                    'is_trial' => false,
                 ]
             ]);
         });

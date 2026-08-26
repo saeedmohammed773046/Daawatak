@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import '../features/auth/login_screen.dart';
 import '../features/events/event_list_screen.dart';
+import '../features/scanner/models/verification_result.dart';
 import '../features/scanner/scanner_screen.dart';
 import '../features/scanner/verification_result_screen.dart';
 
@@ -29,8 +30,18 @@ class AppRouter {
       GoRoute(
         path: '/result',
         builder: (context, state) {
-          final result = state.extra as String; // ACCEPTED, ALREADY_USED, EXPIRED, INVALID
-          return VerificationResultScreen(result: result);
+          final extra = state.extra;
+          final VerificationResultData resultData;
+          if (extra is VerificationResultData) {
+            resultData = extra;
+          } else if (extra is String) {
+            resultData = VerificationResultData.fromString(extra);
+          } else if (extra is Map<String, dynamic>) {
+            resultData = VerificationResultData.fromApiResponse(extra);
+          } else {
+            resultData = VerificationResultData.invalid();
+          }
+          return VerificationResultScreen(resultData: resultData);
         },
       ),
     ],

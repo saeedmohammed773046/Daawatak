@@ -44,4 +44,4 @@ RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache \
     && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
 EXPOSE 8000
-CMD php artisan config:cache && php artisan route:cache && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+CMD php artisan config:cache && php artisan route:cache && (php artisan migrate --force || true) && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
