@@ -27,6 +27,9 @@ import {
   FileText,
   Save,
   AlertTriangle,
+  MessageCircle,
+  Eye,
+  Share2,
 } from 'lucide-react'
 import {
   PieChart,
@@ -70,6 +73,8 @@ import { GenerateInvitationsDialog } from '@/components/invitations/generate-inv
 import { SendInvitationsDialog } from '@/components/invitations/send-invitations-dialog'
 import { ExportInvitationsDialog } from '@/components/invitations/export-invitations-dialog'
 import { ReceptionistsTab } from '@/components/events/receptionists-tab'
+import { InvitationWorkflowBanner } from '@/components/invitations/invitation-workflow-banner'
+import { GuestInvitationModal } from '@/components/invitations/guest-invitation-modal'
 import { useAsync, useDebouncedValue } from '@/hooks/use-async'
 import { eventsService } from '@/services/events.service'
 import { guestsService } from '@/services/guests.service'
@@ -210,9 +215,7 @@ export default function EventDetailPage() {
         </TabsList>
 
         <TabsContent value="overview"><OverviewTab event={event} onNavigateTab={setTab} /></TabsContent>
-        <TabsContent value="guests"><GuestsTab eventId={event.id} /></TabsContent>
-        <TabsContent value="invitations"><InvitationsTab eventId={event.id} guestsCount={event.guestsCount} /></TabsContent>
-        <TabsContent value="checkins"><CheckinsTab eventId={event.id} /></TabsContent>
+        <TabsContent value="invitations"><InvitationsTab event={event} onEventUpdate={refetch} /></TabsContent>
         <TabsContent value="receptionists"><ReceptionistsTab event={event} onEventUpdate={refetch} /></TabsContent>
         <TabsContent value="analytics"><AnalyticsTab eventId={event.id} /></TabsContent>
         <TabsContent value="reports"><ReportsTab eventId={event.id} /></TabsContent>
@@ -396,38 +399,75 @@ function GuestsTab({ eventId }: { eventId: string }) {
 }
 
 // ---------------------------- Invitations Tab ----------------------------
-function InvitationsTab({ eventId, guestsCount }: { eventId: string; guestsCount: number }) {
+function InvitationsTab({ event, onEventUpdate }: { event: any; onEventUpdate: () => void }) {
+  const navigate = useNavigate()
+  const eventId = event.id
+  const guestsCount = event.guestsCount || 0
   const [genOpen, setGenOpen] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [selectedGuest, setSelectedGuest] = useState<{ id: string; name: string; phone?: string; qrCode?: string } | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
   const { data: summary, refetch: refetchSummary } = useAsync(() => invitationsService.summary(eventId), [eventId])
   const { data, isLoading, isError, refetch } = useAsync(() => invitationsService.list(eventId, { pageSize: 100 }), [eventId])
   const invitations = data?.data || []
   const guestsToGenerate = Math.max(guestsCount - (summary?.total || 0), 0)
+  const hasCustomTemplate = Boolean(event.themeConfig && Object.keys(event.themeConfig).length > 0)
 
-  function refreshAll() { refetch(); refetchSummary() }
+  function refreshAll() {
+    refetch()
+    refetchSummary()
+    onEventUpdate()
+  }
+
+  function openGuestModal(inv: any) {
+    setSelectedGuest({
+      id: inv.guestId || inv.id,
+      name: inv.guestName,
+      phone: inv.phone,
+      qrCode: inv.qrCode,
+    })
+    setModalOpen(true)
+  }
+
+  function handleDirectWhatsApp(inv: any) {
+    const rawPhone = (inv.phone || '').replace(/[^0-9]/g, '')
+    const shareableUrl = `${window.location.origin}/dashboard/invitations?eventId=${eventId}&guestId=${inv.guestId || inv.id}`
+    const greeting = `مرحباً ${inv.guestName}، يسعدنا ويشرفنا دعوتكم لحضور ${event.title}.\n\nيمكنكم عرض بطاقة الدعوة ورمز الدخول من الرابط:\n${shareableUrl}`
+    const url = rawPhone ? `https://wa.me/${rawPhone}?text=${encodeURIComponent(greeting)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(greeting)}`
+    window.open(url, '_blank')
+  }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      {/* 4-Step Mandatory Invitation Workflow Banner */}
+      <InvitationWorkflowBanner
+        eventId={eventId}
+        guestsCount={guestsCount}
+        hasCustomTemplate={hasCustomTemplate}
+        invitationsReadyCount={summary?.ready || 0}
+        onGenerateClick={() => setGenOpen(true)}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-base font-semibold">إدارة الدعوات</h3>
+        <h3 className="text-base font-semibold">قائمة الدعوات المخصصة</h3>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/dashboard/invitations/designer?eventId=${eventId}`}><QrCode className="h-3.5 w-3.5" /> المصمم</Link>
+            <Link to={`/dashboard/invitations/designer?eventId=${eventId}`}><QrCode className="h-3.5 w-3.5" /> مصمم القالب</Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="h-3.5 w-3.5" /> تصدير</Button>
-          <Button variant="outline" size="sm" onClick={() => setSendOpen(true)} disabled={!summary?.ready}><Send className="h-3.5 w-3.5" /> إرسال</Button>
-          <Button size="sm" onClick={() => setGenOpen(true)} disabled={guestsToGenerate === 0}><Sparkles className="h-3.5 w-3.5" /> إنشاء الدعوات</Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}><Download className="h-3.5 w-3.5" /> تصدير الكل</Button>
+          <Button variant="outline" size="sm" onClick={() => setSendOpen(true)} disabled={!summary?.ready}><Send className="h-3.5 w-3.5" /> إرسال جماعي</Button>
+          <Button size="sm" onClick={() => setGenOpen(true)} disabled={guestsToGenerate === 0}><Sparkles className="h-3.5 w-3.5" /> توليد الدعوات ({guestsToGenerate})</Button>
         </div>
       </div>
 
       {summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Card><CardContent className="p-4"><p className="text-xl font-bold">{summary.total}</p><p className="text-xs text-muted-foreground">إجمالي الدعوات</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-xl font-bold text-primary">{summary.ready}</p><p className="text-xs text-muted-foreground">جاهزة</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xl font-bold text-primary">{summary.ready}</p><p className="text-xs text-muted-foreground">جاهزة للمشاركة</p></CardContent></Card>
           <Card><CardContent className="p-4"><p className="text-xl font-bold text-gold">{summary.sent}</p><p className="text-xs text-muted-foreground">مُرسلة</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-xl font-bold text-success">{summary.used}</p><p className="text-xs text-muted-foreground">مُستخدمة</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xl font-bold text-success">{summary.used}</p><p className="text-xs text-muted-foreground">مُستخدمة (حضور)</p></CardContent></Card>
         </div>
       )}
 
@@ -436,25 +476,57 @@ function InvitationsTab({ eventId, guestsCount }: { eventId: string; guestsCount
       ) : isLoading ? (
         <div className="flex flex-col gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}</div>
       ) : invitations.length === 0 ? (
-        <EmptyState icon={MailOpen} title="لا توجد دعوات بعد" description="أنشئ الدعوات لجميع المدعوين بضغطة واحدة." actionLabel="إنشاء الدعوات" onAction={() => setGenOpen(true)} />
+        <EmptyState
+          icon={MailOpen}
+          title="لا توجد دعوات بعد"
+          description={guestsCount === 0 ? "أضف المدعوين أولاً ثم اعتمد قالب الدعوة لإنشاء البطاقات." : "تمت إضافة المدعوين، يمكنك الآن اعتماد القالب وتوليد الدعوات بضغطة واحدة."}
+          actionLabel={guestsCount === 0 ? "إضافة مدعوين" : "توليد الدعوات الآن"}
+          onAction={() => guestsCount === 0 ? navigate(`/dashboard/events/${eventId}?tab=guests`) : setGenOpen(true)}
+        />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border/70 bg-card">
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 text-start">المدعو</th>
-                <th className="px-4 py-3 text-start">القناة</th>
                 <th className="px-4 py-3 text-start">الحالة</th>
                 <th className="px-4 py-3 text-start">تاريخ الإنشاء</th>
+                <th className="px-4 py-3 text-end">إدارة ومشاركة الدعوة</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {invitations.slice(0, 20).map((inv) => (
+              {invitations.map((inv) => (
                 <tr key={inv.id} className="hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium">{inv.guestName}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{inv.channel || '—'}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">{inv.guestName}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3"><InvitationStatusBadge status={inv.status} /></td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(inv.createdAt)}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{formatDateTime(inv.createdAt)}</td>
+                  <td className="px-4 py-3 text-end">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2.5 text-xs text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                        onClick={() => handleDirectWhatsApp(inv)}
+                        title="إرسال واتساب مباشر"
+                      >
+                        <MessageCircle className="h-4 w-4 me-1" />
+                        واتساب
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 px-2.5 text-xs"
+                        onClick={() => openGuestModal(inv)}
+                      >
+                        <Eye className="h-3.5 w-3.5 me-1" />
+                        عرض وتحميل
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -462,6 +534,13 @@ function InvitationsTab({ eventId, guestsCount }: { eventId: string; guestsCount
         </div>
       )}
 
+      {/* Modals & Dialogs */}
+      <GuestInvitationModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        guest={selectedGuest}
+        event={event}
+      />
       <GenerateInvitationsDialog open={genOpen} onOpenChange={setGenOpen} eventId={eventId} guestCount={guestsToGenerate} onGenerated={refreshAll} />
       <SendInvitationsDialog open={sendOpen} onOpenChange={setSendOpen} eventId={eventId} total={summary?.ready || 0} onSent={refreshAll} />
       <ExportInvitationsDialog open={exportOpen} onOpenChange={setExportOpen} eventId={eventId} />
