@@ -51,23 +51,42 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     try {
       _scannerController?.dispose();
     } catch (_) {}
+
     _scannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
       facing: CameraFacing.back,
       torchEnabled: false,
-      autoStart: true,
+      autoStart: false,
+      cameraResolution: const Size(1280, 720),
     );
+
+    // Safely start after the widget frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _permissionState == CameraPermissionState.granted) {
+        _safeStartController();
+      }
+    });
+  }
+
+  Future<void> _safeStartController() async {
+    try {
+      await _scannerController?.start();
+    } catch (e) {
+      debugPrint('MobileScanner start error: $e');
+    }
   }
 
   Future<void> _restartScanner() async {
     setState(() {
       _permissionState = CameraPermissionState.checking;
+      _cameraErrorMessage = null;
     });
     try {
       await _scannerController?.stop();
       await _scannerController?.dispose();
     } catch (_) {}
     _scannerController = null;
+    await Future.delayed(const Duration(milliseconds: 300));
     await _checkAndRequestCameraPermission();
   }
 
@@ -77,7 +96,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
     if (state == AppLifecycleState.resumed) {
       if (!_isProcessing) {
-        _scannerController?.start().catchError((_) {});
+        _safeStartController();
       }
     } else if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       _scannerController?.stop().catchError((_) {});
@@ -90,31 +109,40 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       _cameraErrorMessage = null;
     });
 
-    final status = await Permission.camera.status;
+    try {
+      final status = await Permission.camera.status;
 
-    if (status.isGranted) {
-      _onPermissionGranted();
-    } else if (status.isPermanentlyDenied || status.isRestricted) {
-      if (mounted) {
-        setState(() {
-          _permissionState = CameraPermissionState.permanentlyDenied;
-        });
-      }
-    } else {
-      // Request permission directly
-      final requestedStatus = await Permission.camera.request();
-      if (mounted) {
-        if (requestedStatus.isGranted) {
-          _onPermissionGranted();
-        } else if (requestedStatus.isPermanentlyDenied) {
+      if (status.isGranted) {
+        _onPermissionGranted();
+      } else if (status.isPermanentlyDenied || status.isRestricted) {
+        if (mounted) {
           setState(() {
             _permissionState = CameraPermissionState.permanentlyDenied;
           });
-        } else {
-          setState(() {
-            _permissionState = CameraPermissionState.denied;
-          });
         }
+      } else {
+        // Request permission explicitly from the OS
+        final requestedStatus = await Permission.camera.request();
+        if (mounted) {
+          if (requestedStatus.isGranted) {
+            _onPermissionGranted();
+          } else if (requestedStatus.isPermanentlyDenied) {
+            setState(() {
+              _permissionState = CameraPermissionState.permanentlyDenied;
+            });
+          } else {
+            setState(() {
+              _permissionState = CameraPermissionState.denied;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _permissionState = CameraPermissionState.error;
+          _cameraErrorMessage = e.toString();
+        });
       }
     }
   }
@@ -146,8 +174,9 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
     _lastScannedTimestamp = now;
 
-    // Haptic Feedback for immediate physical feedback
+    // Audio & Haptic feedback on scan detection
     try {
+      SystemSound.play(SystemSoundType.click);
       HapticFeedback.mediumImpact();
     } catch (_) {}
 
@@ -189,9 +218,11 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         setState(() {
           _isProcessing = false;
         });
-        try {
-          _scannerController?.start();
-        } catch (_) {}
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && !_isProcessing) {
+            _safeStartController();
+          }
+        });
       }
     });
   }
@@ -552,15 +583,15 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.videocam_off, size: 54, color: Colors.amber),
+                        const Icon(Icons.videocam_off, size: 54, color: Color(0xFFD4AF37)),
                         const SizedBox(height: 14),
                         const Text(
-                          'تعذر عرض معاينة الكاميرا',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          'تعذر تشغيل معاينة الكاميرا',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'خطأ: ${error.errorCode}',
+                          'رمز الخطأ: ${error.errorCode.name}',
                           style: const TextStyle(color: Colors.white54, fontSize: 12),
                         ),
                         const SizedBox(height: 16),
@@ -568,7 +599,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFD4AF37),
                             foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: _restartScanner,

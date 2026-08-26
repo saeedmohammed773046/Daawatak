@@ -27,10 +27,13 @@ class _VerificationResultScreenState extends State<VerificationResultScreen> {
     try {
       final status = widget.resultData.status.toUpperCase();
       if (status == 'ACCEPTED') {
+        SystemSound.play(SystemSoundType.click);
         HapticFeedback.mediumImpact();
       } else if (status == 'ALREADY_USED') {
+        SystemSound.play(SystemSoundType.alert);
         HapticFeedback.heavyImpact();
       } else {
+        SystemSound.play(SystemSoundType.alert);
         HapticFeedback.vibrate();
       }
     } catch (_) {}
