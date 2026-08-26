@@ -177,7 +177,7 @@ class ReceptionController extends Controller
                             'name' => $guest->name,
                             'phone' => $guest->phone,
                         ],
-                        'is_trial' => false,
+                        'is_trial' => $isTrial,
                     ]
                 ]);
             }
@@ -207,7 +207,7 @@ class ReceptionController extends Controller
                             'companions_count' => $guest->companions_count,
                             'table_number' => $guest->table_number ?? null,
                         ],
-                        'is_trial' => false,
+                        'is_trial' => $isTrial,
                     ]
                 ]);
             }
@@ -244,7 +244,7 @@ class ReceptionController extends Controller
                         'companions_count' => $guest->companions_count,
                         'table_number' => $guest->table_number ?? null,
                     ],
-                    'is_trial' => false,
+                    'is_trial' => $isTrial,
                 ]
             ]);
         });
