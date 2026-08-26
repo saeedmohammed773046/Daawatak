@@ -132,20 +132,27 @@ export const eventsService = {
     return mapEvent(res.data)
   },
 
-  async update(id: string, payload: Partial<EventItem>): Promise<EventItem> {
+  async update(id: string, payload: Partial<EventItem> & { googleMapsUrl?: string }): Promise<EventItem> {
     if (env.useMock) {
       const existing = getEventById(id)
       return mockResolve({ ...(existing as EventItem), ...payload })
+    }
+
+    let dateVal: string | undefined = undefined
+    if (payload.date) {
+      dateVal = payload.date.includes('T') ? payload.date.split('T')[0] : payload.date
     }
 
     const res = await http.put<{ success: boolean; data: any }>(`/events/${id}`, {
       title: payload.title,
       description: payload.description,
       category: payload.type,
-      event_date: payload.date ? payload.date.split('T')[0] : undefined,
+      event_date: dateVal,
       start_time: payload.time,
       venue: payload.venue,
       status: payload.status,
+      access_pin: payload.accessPin,
+      google_maps_url: payload.googleMapsUrl,
       cover_image_url: payload.coverUrl,
     })
 

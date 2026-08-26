@@ -42,6 +42,7 @@ import {
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -91,7 +92,7 @@ export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') || 'overview'
+  const tab = params.get('tab') || (params.get('edit') === '1' ? 'settings' : 'overview')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   const { data: event, isLoading, isError, refetch } = useAsync(() => eventsService.getById(id!), [id])
@@ -669,48 +670,64 @@ function ReportsTab({ eventId }: { eventId: string }) {
           </div>
         </CardContent>
       </Card>
-
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-muted-foreground">التقارير الأخيرة</h3>
-        {isLoading ? (
-          <div className="flex flex-col gap-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}</div>
-        ) : !recent || recent.length === 0 ? (
-          <EmptyState icon={FileText} title="لا توجد تقارير سابقة" />
-        ) : (
-          <div className="flex flex-col gap-2">
-            {recent.map((r: any) => (
-              <div key={r.id} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  {r.format === 'excel' ? <FileSpreadsheet className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{reportTypes.find((t) => t.key === r.type)?.label}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(r.createdAt)}</p>
-                </div>
-                <Badge variant="secondary">{r.format.toUpperCase()}</Badge>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
 
 // ---------------------------- Settings Tab ----------------------------
-function SettingsTab({ event, onDelete }: { event: any; onDelete: () => void }) {
-  const [title, setTitle] = useState(event.title)
-  const [venue, setVenue] = useState(event.venue)
-  const [city, setCity] = useState(event.city)
+const eventTypeOptions = [
+  { value: 'wedding', label: 'حفل زفاف' },
+  { value: 'engagement', label: 'خطوبة' },
+  { value: 'graduation', label: 'حفل تخرج' },
+  { value: 'birthday', label: 'عيد ميلاد' },
+  { value: 'conference', label: 'مؤتمر' },
+  { value: 'meeting', label: 'اجتماع' },
+  { value: 'opening', label: 'افتتاح' },
+  { value: 'special', label: 'مناسبة خاصة' },
+]
+
+function SettingsTab({ event, onDelete, onEventUpdate }: { event: any; onDelete: () => void; onEventUpdate?: () => void }) {
+  const [title, setTitle] = useState(event.title || '')
+  const [type, setType] = useState(event.type || 'wedding')
+  const [date, setDate] = useState(event.date ? (event.date.includes('T') ? event.date.split('T')[0] : event.date) : '')
+  const [time, setTime] = useState(event.time || '8:00 مساءً')
+  const [venue, setVenue] = useState(event.venue || '')
+  const [city, setCity] = useState(event.city || '')
+  const [accessPin, setAccessPin] = useState(event.accessPin || '123456')
+  const [status, setStatus] = useState(event.status || 'published')
+  const [description, setDescription] = useState(event.description || '')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setTitle(event.title || '')
+    setType(event.type || 'wedding')
+    setDate(event.date ? (event.date.includes('T') ? event.date.split('T')[0] : event.date) : '')
+    setTime(event.time || '8:00 مساءً')
+    setVenue(event.venue || '')
+    setCity(event.city || '')
+    setAccessPin(event.accessPin || '123456')
+    setStatus(event.status || 'published')
+    setDescription(event.description || '')
+  }, [event])
 
   async function handleSave() {
     setSaving(true)
     try {
-      await eventsService.update(event.id, { title, venue, city })
-      toast.success('تم حفظ التغييرات بنجاح')
-    } catch {
-      toast.error('تعذر حفظ التغييرات')
+      await eventsService.update(event.id, {
+        title,
+        type,
+        date,
+        time,
+        venue,
+        city,
+        accessPin,
+        status,
+        description,
+      })
+      toast.success('تم حفظ وتحديث بيانات المناسبة بنجاح')
+      onEventUpdate?.()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'تعذر حفظ التغييرات')
     } finally {
       setSaving(false)
     }
@@ -719,24 +736,88 @@ function SettingsTab({ event, onDelete }: { event: any; onDelete: () => void }) 
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardContent className="flex flex-col gap-4 p-5">
-          <h3 className="text-base font-semibold">الإعدادات العامة</h3>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="settings-title">اسم المناسبة</Label>
-            <Input id="settings-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <CardContent className="flex flex-col gap-5 p-5 sm:p-6">
+          <div>
+            <h3 className="text-lg font-bold">تعديل بيانات المناسبة</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">قم بتعديل بيانات المناسبة وتحديث التاريخ والموقع وسيتم حفظها في النظام فوراً.</p>
           </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="settings-venue">القاعة / الموقع</Label>
-              <Input id="settings-venue" value={venue} onChange={(e) => setVenue(e.target.value)} />
+              <Label htmlFor="settings-title">اسم المناسبة <span className="text-destructive">*</span></Label>
+              <Input id="settings-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: حفل زفاف أحمد & سارة" />
             </div>
+
             <div className="flex flex-col gap-2">
-              <Label htmlFor="settings-city">المدينة</Label>
-              <Input id="settings-city" value={city} onChange={(e) => setCity(e.target.value)} />
+              <Label htmlFor="settings-type">نوع المناسبة</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger id="settings-type">
+                  <SelectValue placeholder="اختر نوع المناسبة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eventTypeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <div>
-            <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> حفظ التغييرات</Button>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="settings-date">تاريخ المناسبة <span className="text-destructive">*</span></Label>
+              <Input id="settings-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="settings-time">وقت المناسبة</Label>
+              <Input id="settings-time" value={time} onChange={(e) => setTime(e.target.value)} placeholder="مثال: 8:00 مساءً" />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="settings-venue">القاعة / الموقع <span className="text-destructive">*</span></Label>
+              <Input id="settings-venue" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="مثال: قاعة الفورسيزونز" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="settings-city">المدينة</Label>
+              <Input id="settings-city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="مثال: الرياض" />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="settings-pin">رمز دخول البوابة (Access PIN)</Label>
+              <Input id="settings-pin" value={accessPin} maxLength={6} onChange={(e) => setAccessPin(e.target.value)} placeholder="6 أرقام" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="settings-status">حالة الفعالية</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger id="settings-status">
+                  <SelectValue placeholder="اختر حالة الفعالية" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="published">منشورة (نشطة)</SelectItem>
+                  <SelectItem value="draft">مسودة</SelectItem>
+                  <SelectItem value="completed">مكتملة</SelectItem>
+                  <SelectItem value="archived">مؤرشفة</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="settings-desc">وصف المناسبة</Label>
+            <Textarea id="settings-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="ملاحظات أو تفاصيل إضافية حول المناسبة..." />
+          </div>
+
+          <div className="flex justify-start pt-2">
+            <Button onClick={handleSave} loading={saving} className="min-w-[140px]">
+              <Save className="h-4 w-4" /> حفظ التغييرات
+            </Button>
           </div>
         </CardContent>
       </Card>
